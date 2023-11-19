@@ -25,19 +25,20 @@ classdef MotorThermalAnalysis
 
         function [motorComponents, motorOperationalParams] = getUserInput()
 
-            % Display default values
+            defaultTmax = 60;
             % Display default values
             disp('<strong>Default Motor Component and Operational Parameters:</strong>');
             disp('---------------------------------------------------');
             disp('<strong>Stator:</strong> Outer Diameter = 27.5 mm, Inner Diameter = 5 mm, Length = 26 mm, Thermal Conductivity = 225.5 W/mK, Heat Capacity = 0.4255 J/kgK');
             disp('<strong>Rotor:</strong> Outer Diameter = 35 mm, Inner Diameter = 30 mm, Length = 36 mm, Thermal Conductivity = 167 W/mK, Heat Capacity = 0.89 J/kgK');
             disp('<strong>Axle:</strong> Outer Diameter = 5 mm, Length = 55 mm, Thermal Conductivity = 50 W/mK, Heat Capacity = 0.466 J/kgK');
-            disp('<strong>Operational Parameters:</strong> Voltage = 14.7 V, Kv = 230 RPM/V, Phase Resistance = 0.055178 Ohms');
+            disp('<strong>Operational Parameters:</strong> Voltage = 14.7 V, Kv = 230 RPM/V, ax Motor Temp = 60C Phase Resistance = 0.055178 Ohms');
             disp('---------------------------------------------------');
             % Ask user to choose between default values or custom values
             choice = MotorThermalAnalysis.getYorNInput('Do you want to use default values? (Y/N): ');
 
             if upper(choice) == 'Y'
+
                 % Use default values
                 % Example default values
                 % cp copper = 0.385 J/gC
@@ -48,7 +49,7 @@ classdef MotorThermalAnalysis
                 rotor = struct('OuterDiameter', 35, 'InnerDiameter', 30, 'Length', 36, 'K_Conductivity', 167, 'C_HeatCapacity', 0.89);
                 axle = struct('OuterDiameter', 5, 'InnerDiameter', 0, 'Length', 55, 'K_Conductivity', 50, 'C_HeatCapacity', 0.466);
                 motorComponents = struct('stator', stator, 'rotor', rotor, 'axle', axle);
-                motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178);
+                motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178, 'Tmax',defaultTmax);
             else
                 % Prompt for custom values
                 disp('<strong>==============================</strong>');
@@ -107,13 +108,15 @@ classdef MotorThermalAnalysis
 
                 if upper(choiceOperationalParams) == 'Y'
                     % Use default operational parameters
-                    motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178);
+                    motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178, 'Tmax',defaultTmax);
                 else
                     % Prompt for custom operational parameters
+
                     motorOperationalParams.Voltage = input('Enter operating voltage (V): ');
                     motorOperationalParams.Current = input('Enter operating current (A): ');
                     motorOperationalParams.Kv = input('Enter motor Kv rating (RPM/V): ');
                     motorOperationalParams.PhaseResistance = input('Enter phase resistance (Ohms): ');
+                    motorOperationalParams.Tmax = input('Enter maximum operating temperature of motor (C): ');
                 end
                 % Construct and return the motorComponents and motorOperationalParams structures
                 motorComponents = struct('stator', stator, 'rotor', rotor, 'axle', axle);
@@ -129,7 +132,7 @@ classdef MotorThermalAnalysis
 
             % Extract Material Properties from structure
             k = geometry.K_Conductivity;
-            cp = geometry.C_HeatCapacity;
+            %cp = geometry.C_HeatCapacity;
 
             % Calculate the thermal Resistance for hollow cylinder
             outerRadius = outerDiameter /2;
@@ -192,6 +195,52 @@ classdef MotorThermalAnalysis
             powerLoss = I^2 * R_phase;  % Power loss in Watts
         end
 
+
+        function h = calcConvectiveHeatTransferCoeff(motorSpeed, Diameter)
+            % Calculate the convective heat transfer coefficient (h)
+            % motorSpeed in RPM, rotorDiameter in mm, V_inf in m/s
+
+            % Air properties at room temperature (20°C)
+            k_air = 0.0253; % Thermal conductivity of air (W/mK)
+            Pr = 0.725;     % Prandtl number for air
+
+            % Convert RPM to m/s (assuming the tip of the rotor)
+            tip_speed = (motorSpeed * pi / 30) * (Diameter / 1000 / 2);
+
+            % Calculate Reynolds number based on V_inf and rotor diameter
+            % (Determine air density and dynamic viscosity at average temperature)
+            p = 1.12105; % Density of air
+            u = 1.1916e-5; % Dynamic viscosity of air
+            Re = (tip_speed * (Diameter / 1000) * p) / u;
+
+            % Define the correlation table
+            correlation_table = struct(...
+                'Re_ranges', {[0.4, 4; 4, 40; 40, 4000; 4000, 40000; 40000, 400000]},...
+                'B_values', [0.989, 0.911, 0.683, 0.193, 0.027],...
+                'n_values', [0.330, 0.385, 0.366, 0.618, 0.805]...
+                );
+
+            for i = 1:length(correlation_table.Re_ranges)
+                if Re >= correlation_table.Re_ranges(i) && Re < correlation_table.Re_ranges(i+1)
+                    B = correlation_table.B_values(i);
+                    n = correlation_table.n_values(i);
+                end
+            end
+            % Calculate Nusselt number using selected correlation
+            Nu = B * Re^n * Pr^(1/3);
+
+            % Solve for h (using rotor diameter as characteristic length)
+            h = Nu * k_air / (Diameter / 1000); % h in W/m^2K
+        end
+
+        function R_conv = calcConvectiveResistance(h, surfaceArea)
+            % Calculate the equivalent convective resistance (R_conv)
+            % h is the convective heat transfer coefficient (W/m^2K)
+            % surfaceArea in m^2
+
+            R_conv = 1 / (h * surfaceArea);
+        end
+
     end
 
-end
+end 
