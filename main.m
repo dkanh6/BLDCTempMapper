@@ -1,25 +1,53 @@
 %% Main Script
 
-% In your main script or function
-motorComponents = MotorThermalAnalysis.getUserInput();
+% Gather User Input for Motor Components
+[motorComponents, motorOperationalParams] = MotorThermalAnalysis.getUserInput();
 
-% Now motorComponents has stator and rotor fields that you can use
-statorResistance = MotorThermalAnalysis.calcThermalResistance(motorComponents.stator);
-rotorResistance = MotorThermalAnalysis.calcThermalResistance(motorComponents.rotor);
+% Extract operational parameters
+V = motorOperationalParams.Voltage;
+I = motorOperationalParams.Current;
+Kv = motorOperationalParams.Kv;
+R_phase = motorOperationalParams.PhaseResistance;
 
+% Estimate Motor Parameters (Speed and Power Loss)
+[motorSpeed, powerLoss] = MotorThermalAnalysis.estimateMotorParameters(V, I, Kv, R_phase);
 
+% Display the estimated motor speed and power loss
+disp(['<strong>Motor Speed:</strong> ', num2str(motorSpeed), ' RPM']);
+disp(['<strong>Power Loss:</strong> ', num2str(powerLoss), ' Watts']);
 
+% Calculate Thermal Resistances
+R_thermal_rotor = MotorThermalAnalysis.calcThermalResistance(motorComponents.rotor);
+R_thermal_stator = MotorThermalAnalysis.calcThermalResistance(motorComponents.stator);
 
-% Set up Paramters
-R_thermal_rotor = 0;  
-C_thermal_rotor = 0;       % Total thermal capacitance of the rotor (J/K)
-R_thermal_stator = 0;
-C_thermal_stator = 0;                % Total thermal apacitance of the stator (J/K) r_thermal_rotor = 1;         % Thermal resistance of the rotor (K/W)% Thermal resistance of the stator (K/W)
-T_ambient = 24;              % Ambient temperature (°C)
-total_time = 3000;           % Total time for simulation (s)
-num_steps = 9000;            % Number of steps in the simulation
-R_phase = 0.055178;         % Resistance of one phase
-K_transfer = 0;            % Heat transfer coefficient (W/K)
+% Assume initial temperatures
+T_initial_rotor = 25; % Initial temperature in °C
+T_initial_stator = 25; % Initial temperature in °C
 
+% Simulation Parameters
+total_time = 3000; % Total simulation time in seconds
+num_steps = 300;  % Number of simulation steps
 
+% Time array for simulation
+time = linspace(0, total_time, num_steps);
 
+% Initialize temperature arrays
+T_rotor = zeros(1, num_steps);
+T_stator = zeros(1, num_steps);
+T_rotor(1) = T_initial_rotor;
+T_stator(1) = T_initial_stator;
+
+% Thermal Model Simulation
+for i = 2:num_steps
+    % Update the temperatures
+    % Implement the logic considering the interaction between rotor, stator, and axle
+    % ...
+end
+
+% Plotting Results
+plot(time, T_rotor, 'r', time, T_stator, 'b');
+legend('Rotor Temperature', 'Stator Temperature');
+xlabel('Time (s)');
+ylabel('Temperature (°C)');
+title('Motor Thermal Simulation');
+grid on;

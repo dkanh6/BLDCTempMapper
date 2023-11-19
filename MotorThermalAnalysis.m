@@ -23,7 +23,17 @@ classdef MotorThermalAnalysis
             k_composite = (k_copper * copperFraction) + (k_steel * steelFraction);
         end
 
-        function motorComponents = getUserInput()
+        function [motorComponents, motorOperationalParams] = getUserInput()
+
+            % Display default values
+            % Display default values
+            disp('<strong>Default Motor Component and Operational Parameters:</strong>');
+            disp('---------------------------------------------------');
+            disp('<strong>Stator:</strong> Outer Diameter = 27.5 mm, Inner Diameter = 5 mm, Length = 26 mm, Thermal Conductivity = 225.5 W/mK, Heat Capacity = 0.4255 J/kgK');
+            disp('<strong>Rotor:</strong> Outer Diameter = 35 mm, Inner Diameter = 30 mm, Length = 36 mm, Thermal Conductivity = 167 W/mK, Heat Capacity = 0.89 J/kgK');
+            disp('<strong>Axle:</strong> Outer Diameter = 5 mm, Length = 55 mm, Thermal Conductivity = 50 W/mK, Heat Capacity = 0.466 J/kgK');
+            disp('<strong>Operational Parameters:</strong> Voltage = 14.7 V, Kv = 230 RPM/V, Phase Resistance = 0.055178 Ohms');
+            disp('---------------------------------------------------');
             % Ask user to choose between default values or custom values
             choice = MotorThermalAnalysis.getYorNInput('Do you want to use default values? (Y/N): ');
 
@@ -37,14 +47,16 @@ classdef MotorThermalAnalysis
                 stator = struct('OuterDiameter', 27.5, 'InnerDiameter', 5, 'Length', 26, 'K_Conductivity', k_stator, 'C_HeatCapacity', cp_stator); % Assuming 50:50 ratio of copper to steel to calculate the thermal capacitance and conductivity
                 rotor = struct('OuterDiameter', 35, 'InnerDiameter', 30, 'Length', 36, 'K_Conductivity', 167, 'C_HeatCapacity', 0.89);
                 axle = struct('OuterDiameter', 5, 'InnerDiameter', 0, 'Length', 55, 'K_Conductivity', 50, 'C_HeatCapacity', 0.466);
+                motorComponents = struct('stator', stator, 'rotor', rotor, 'axle', axle);
+                motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178);
             else
                 % Prompt for custom values
-                disp('==============================');
-                disp('CUSTOM MOTOR COMPONENT INPUT');
-                disp('==============================');
+                disp('<strong>==============================</strong>');
+                disp('<strong>CUSTOM MOTOR COMPONENT INPUT</strong>');
+                disp('<strong>==============================</strong>');
 
                 % Stator Information
-                disp('STATOR INFORMATION:');
+                disp('<strong>STATOR INFORMATION:</strong>');
                 disp('-------------------');
                 stator.OuterDiameter = input('Enter Stator Outer Diameter (mm): ');
                 stator.InnerDiameter = input('Enter Stator Inner Diameter (mm): ');
@@ -54,7 +66,7 @@ classdef MotorThermalAnalysis
                 disp(' ');
 
                 % Rotor Information
-                disp('ROTOR INFORMATION:');
+                disp('<strong>ROTOR INFORMATION:</strong>');
                 disp('------------------');
                 rotor.OuterDiameter = input('Enter Rotor Outer Diameter (mm): ');
                 rotor.InnerDiameter = input('Enter Rotor Inner Diameter (mm): ');
@@ -64,8 +76,9 @@ classdef MotorThermalAnalysis
                 disp(' ');
 
                 % Axle Information
-                disp('AXLE INFORMATION:');
+                disp('<strong>AXLE INFORMATION:</strong>');
                 disp('-----------------');
+
 
                 % Option to dynamically estimate axle data or enter manually
                 axleChoice = MotorThermalAnalysis.getYorNInput('Do you want to dynamically estimate axle data? (Y/N): ');
@@ -88,7 +101,21 @@ classdef MotorThermalAnalysis
                     axle.C_HeatCapacity = input('Enter Axle Specific Heat Capacity (J/kgK): ');
                 end
 
-                % Construct and return the motorComponents structure
+
+                % Ask user to choose between default values or custom values for operational parameters
+                choiceOperationalParams = MotorThermalAnalysis.getYorNInput('Do you want to use default values for operational parameters? (Y/N): ');
+
+                if upper(choiceOperationalParams) == 'Y'
+                    % Use default operational parameters
+                    motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178);
+                else
+                    % Prompt for custom operational parameters
+                    motorOperationalParams.Voltage = input('Enter operating voltage (V): ');
+                    motorOperationalParams.Current = input('Enter operating current (A): ');
+                    motorOperationalParams.Kv = input('Enter motor Kv rating (RPM/V): ');
+                    motorOperationalParams.PhaseResistance = input('Enter phase resistance (Ohms): ');
+                end
+                % Construct and return the motorComponents and motorOperationalParams structures
                 motorComponents = struct('stator', stator, 'rotor', rotor, 'axle', axle);
             end
 
