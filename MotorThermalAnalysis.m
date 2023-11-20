@@ -1,11 +1,13 @@
 
 classdef MotorThermalAnalysis
+    properties (Constant)
+        someFactor = 2000; % Example value, adjust based on your requirements
+    end
     methods (Static)
-
         function [cp_composite, k_composite] = calcCompositeProperties(copperFraction)
             % Define the specific heat capacities (J/g°C)
-            cp_copper = 0.385; % Copper
-            cp_steel = 0.466;  % Steel
+            cp_copper = 385; % Copper
+            cp_steel = 466;  % Steel
 
             % Define the thermal conductivities (W/mK)
             k_copper = 401;    % Copper
@@ -21,6 +23,24 @@ classdef MotorThermalAnalysis
             % Using a simple linear rule of mixture (not strictly series or
             % parallell construction in the stator)
             k_composite = (k_copper * copperFraction) + (k_steel * steelFraction);
+        end
+        function C = calcThermalCapacitance(geometry, cp_composite)
+            % Extract geometric properties from structure
+            outerDiameter = geometry.OuterDiameter / 1000; % Convert to meters
+            innerDiameter = geometry.InnerDiameter / 1000; % Convert to meters
+            length = geometry.Length / 1000; % Convert to meters
+
+            % Calculate the volume of the hollow cylinder (assuming it's a hollow cylinder)
+            volume = pi * (outerDiameter^2 - innerDiameter^2) / 4 * length;
+
+            % Density (assuming some average density, needs to be adjusted based on actual material)
+            density = 8000; % Example: 8000 kg/m^3 for steel
+
+            % Calculate mass
+            mass = density * volume;
+
+            % Calculate thermal capacitance
+            C = cp_composite * mass;
         end
 
         function [motorComponents, motorOperationalParams] = getUserInput()
@@ -46,10 +66,13 @@ classdef MotorThermalAnalysis
                 % cp Steel = 0.466 J/gC
                 [cp_stator, k_stator] = MotorThermalAnalysis.calcCompositeProperties(0.5); % 50% copper
                 stator = struct('OuterDiameter', 27.5, 'InnerDiameter', 5, 'Length', 26, 'K_Conductivity', k_stator, 'C_HeatCapacity', cp_stator); % Assuming 50:50 ratio of copper to steel to calculate the thermal capacitance and conductivity
-                rotor = struct('OuterDiameter', 35, 'InnerDiameter', 30, 'Length', 36, 'K_Conductivity', 167, 'C_HeatCapacity', 0.89);
-                axle = struct('OuterDiameter', 5, 'InnerDiameter', 0, 'Length', 55, 'K_Conductivity', 50, 'C_HeatCapacity', 0.466);
+                rotor = struct('OuterDiameter', 35, 'InnerDiameter', 30, 'Length', 36, 'K_Conductivity', 167, 'C_HeatCapacity', 890);
+                axle = struct('OuterDiameter', 5, 'InnerDiameter', 0.1, 'Length', 55, 'K_Conductivity', 50, 'C_HeatCapacity', 466);
                 motorComponents = struct('stator', stator, 'rotor', rotor, 'axle', axle);
                 motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178, 'Tmax',defaultTmax);
+                motorComponents.stator.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.stator, motorComponents.stator.C_HeatCapacity);
+                motorComponents.rotor.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.rotor, motorComponents.rotor.C_HeatCapacity);
+                motorComponents.axle.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.axle, motorComponents.axle.C_HeatCapacity);
             else
                 % Prompt for custom values
                 disp('<strong>==============================</strong>');
@@ -91,8 +114,8 @@ classdef MotorThermalAnalysis
                     axle.OuterDiameter = rotor.InnerDiameter; % Example estimation
                     axle.InnerDiameter = 0; % Typically zero for a solid axle
                     axle.Length = stator.Length; % Example estimation
-                    axle.K_Conductivity = 60; % Default or estimated value
-                    axle.C_HeatCapacity = 920; % Default or estimated value
+                    axle.K_Conductivity = 50; % Default or estimated value
+                    axle.C_HeatCapacity = 0.466; % Default or estimated value
                 else
                     % Manual input for axle data
                     axle.OuterDiameter = input('Enter Axle Outer Diameter (mm): ');
@@ -128,17 +151,19 @@ classdef MotorThermalAnalysis
             % Extract geometric properties from structure
             outerDiameter = geometry.OuterDiameter;
             innerDiameter = geometry.InnerDiameter;
-            length  = geometry.Length;
+            length = geometry.Length;
 
             % Extract Material Properties from structure
             k = geometry.K_Conductivity;
-            %cp = geometry.C_HeatCapacity;
 
             % Calculate the thermal Resistance for hollow cylinder
-            outerRadius = outerDiameter /2;
-            innerRadius = innerDiameter /2;
+            outerRadius = outerDiameter / 2;
+            innerRadius = innerDiameter / 2;
 
             R_thermal = log(outerRadius/innerRadius) / (2 * pi * k * length);
+
+            % Debugging print statement
+            disp(['<strong>R_cond calculated: </strong>', num2str(R_thermal)]);
         end
 
         function response = getYorNInput(promptMessage)
@@ -171,13 +196,10 @@ classdef MotorThermalAnalysis
         end
 
         function Q = estimateHeatTransfer(axle, stator, T_axle, T_stator)
-            % Axle and stator structures are expected to contain material properties and dimensions
-            % T_axle and T_stator are the temperatures of the axle and stator, respectively
-
             % Calculate the cross-sectional area of the axle
             A_cross_section = pi * (axle.OuterDiameter / 2)^2;
 
-            % Calculate the length of the heat path (assuming it's the length of the axle)
+            % Calculate the length of the heat path
             L_heat_path = axle.Length;
 
             % Calculate the temperature gradient
@@ -185,24 +207,27 @@ classdef MotorThermalAnalysis
 
             % Fourier's law of heat conduction
             Q = axle.K_Conductivity * A_cross_section * delta_T / L_heat_path;
+
+            % Debugging print statement
+            disp(['<strong>Q (Heat Transfer via Axle) calculated: </strong>', num2str(Q)]);
         end
 
         function [motorSpeed, powerLoss] = estimateMotorParameters(V, I, Kv, R_phase)
-            % Estimate motor speed (RPM) assuming no load
-            motorSpeed = Kv * V;  % Ideal no-load speed in RPM
-
-            % Calculate power loss due to resistance in windings
-            powerLoss = I^2 * R_phase;  % Power loss in Watts
+            % Constant motor speed and simplified power loss calculation
+            motorSpeed = 4000; % Constant RPM
+            powerLoss = I^2 * R_phase;
         end
 
-
-        function h = calcConvectiveHeatTransferCoeff(motorSpeed, Diameter)
+        function h = calcConvectiveHeatTransferCoeff(motorSpeed, Diameter, T_surface, T_ambient)
             % Calculate the convective heat transfer coefficient (h)
             % motorSpeed in RPM, rotorDiameter in mm, V_inf in m/s
 
             % Air properties at room temperature (20°C)
             k_air = 0.0253; % Thermal conductivity of air (W/mK)
             Pr = 0.725;     % Prandtl number for air
+            beta = 1/293;   % Thermal expansion coefficient (1/K) (assumed for air at ~20°C)
+            g = 9.81;       % Acceleration due to gravity (m/s^2)
+            nu = 1.568e-5;  % Kinematic viscosity of air (m^2/s)
 
             % Convert RPM to m/s (assuming the tip of the rotor)
             tip_speed = (motorSpeed * pi / 30) * (Diameter / 1000 / 2);
@@ -219,15 +244,39 @@ classdef MotorThermalAnalysis
                 'B_values', [0.989, 0.911, 0.683, 0.193, 0.027],...
                 'n_values', [0.330, 0.385, 0.366, 0.618, 0.805]...
                 );
-
-            for i = 1:length(correlation_table.Re_ranges)
-                if Re >= correlation_table.Re_ranges(i) && Re < correlation_table.Re_ranges(i+1)
+            isForcedConvectionApplicable = false;
+            for i = 1:size(correlation_table.Re_ranges, 1)
+                if Re >= correlation_table.Re_ranges(i, 1) && Re < correlation_table.Re_ranges(i, 2)
                     B = correlation_table.B_values(i);
                     n = correlation_table.n_values(i);
+                    isForcedConvectionApplicable = true;
+                    break;
                 end
             end
-            % Calculate Nusselt number using selected correlation
-            Nu = B * Re^n * Pr^(1/3);
+
+            % Calculate h based on the type of convection
+            persistent switchedToNaturalLastTime; % Track the last mode of convection
+            if isForcedConvectionApplicable
+                % Forced Convection
+                Nu = B * Re^n * Pr^(1/3);
+                switchedToNaturalLastTime = false;
+            else
+                % Natural Convection
+                if ~switchedToNaturalLastTime
+                    disp('Switching to natural convection.');
+                    switchedToNaturalLastTime = true;
+                end
+                delta_T = T_surface - T_ambient;
+                Gr = g * beta * abs(delta_T) * (Diameter / 1000)^3 / nu^2; % Grashof number
+                Ra = Gr * Pr; % Rayleigh number
+
+                % Empirical correlation for natural convection (e.g., vertical plate)
+                if Ra < 1e9
+                    Nu = 0.59 * Ra^(1/4);
+                else
+                    Nu = 0.10 * Ra^(1/3);
+                end
+            end
 
             % Solve for h (using rotor diameter as characteristic length)
             h = Nu * k_air / (Diameter / 1000); % h in W/m^2K
@@ -239,8 +288,28 @@ classdef MotorThermalAnalysis
             % surfaceArea in m^2
 
             R_conv = 1 / (h * surfaceArea);
+            fprintf("Here is the R_conv: %d",R_conv);
+        end
+
+        function I = currentProfile(t, lowCurrentStarts, lowCurrentEnds)
+            % Simplified current profile for constant RPM
+            % Check if it's a low-current period
+            if MotorThermalAnalysis.lowCurrentPeriod(t, lowCurrentStarts, lowCurrentEnds)
+                I = 1; % Low current value
+                return;
+            end
+
+            % Existing logic for normal operation
+            % Base Oscillation
+            I = 8 + 6 * sin(2 * pi * t / 50);
+        end
+
+        function isLowCurrent = lowCurrentPeriod(t, lowCurrentStarts, lowCurrentEnds)
+            % Check if current time is within any of the low current periods
+            isLowCurrent = any(t >= lowCurrentStarts & t <= lowCurrentEnds);
+            disp(['Low Current Period Check at time: ', num2str(t), ', Result: ', num2str(isLowCurrent)]);
         end
 
     end
 
-end 
+end
