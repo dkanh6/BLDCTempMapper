@@ -7,15 +7,15 @@
 V = motorOperationalParams.Voltage;
 Kv = motorOperationalParams.Kv;
 R_phase = motorOperationalParams.PhaseResistance;
-baseSpeed = Kv * V;
+
 
 % Define low current periods
 lowCurrentStarts = [0, 300, 1020];
 lowCurrentEnds = [120, 420, 1320];
 
 % Simulation Parameters
-total_time = 1000; % Total simulation time in seconds
-num_steps = 1000;  % Number of simulation steps
+total_time = 500; % Total simulation time in seconds
+num_steps = 1500;  % Number of simulation steps
 time_step = total_time / num_steps; % Time step
 T_environment = 24; % Ambient temperature (C)
 time = linspace(0, total_time, num_steps); % Time array
@@ -36,7 +36,14 @@ R_thermal = 4.9163;  % Thermal resistance (K/W)
 
 for i = 2:num_steps
     % Dynamic current value based on the profile
-    current = MotorThermalAnalysis.currentProfile(time(i), lowCurrentStarts, lowCurrentEnds);
+    % Dynamic current value based on gait profile
+    current = MotorThermalAnalysis.currentProfileForGait(time(i), total_time, lowCurrentStarts, lowCurrentEnds);
+    disp(current)
+
+    % Adjusted motor speed based on current
+    % Example relationship: motorSpeed = baseSpeed + someFactor * current
+    someFactor = 250; % Adjust this factor based on your motor's characteristics
+    motorSpeed = someFactor * current; % Calculate dynamic motor speed
 
     % Calculate Power Loss in Stator (Simplified)
     powerLoss = current^2 * R_phase;
@@ -54,24 +61,25 @@ for i = 2:num_steps
     T_rotor(i) = T_rotor(i-1) + dTdt_rotor * time_step;
 
     % Display Information for Debugging
-    disp(['Time: ', num2str(time(i)), ' s, Stator Temperature: ', num2str(T_stator(i)), ' °C, Rotor Temperature: ', num2str(T_rotor(i)), ' °C']);
+    disp(['Time: ', num2str(time(i)), ...
+          ' s, Motor Speed: ', num2str(motorSpeed)]);
+end
 
-    % Check for Unrealistic Temperatures
-    if T_stator(i) > 1000 || T_rotor(i) > 1000 % Use realistic thresholds for your motor
-        disp(['Warning: Exceedingly high temperature at time ', num2str(time(i)), ' s. Check calculations and parameters.']);
-        break; % Break out of the loop if temperatures are unrealistically high
-    end
-end 
 
 %% Plotting Results
-plot(time, T_stator, 'b', time, T_rotor, 'r');
+% Plotting Results
+% Plotting Results
+time = 0:time_step:(total_time-time_step);
+plot(time, T_stator, 'b', 'LineWidth', 1);
+hold on;  % Hold on to the current plot
+plot(time, T_rotor, 'r', 'LineWidth', 1);
+hold off; % Release the plot hold
+
 xlabel('Time (s)');
 ylabel('Temperature (°C)');
 title('Stator and Rotor Thermal Simulation');
 legend('Stator', 'Rotor');
 grid on;
-
-%% Auxiliary Functions
 
 
 
