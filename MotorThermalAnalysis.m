@@ -1,7 +1,6 @@
 
 classdef MotorThermalAnalysis
     properties (Constant)
-        someFactor = 2000; % Example value, adjust based on your requirements
     end
     methods (Static)
         function [cp_composite, k_composite] = calcCompositeProperties(copperFraction)
@@ -24,7 +23,7 @@ classdef MotorThermalAnalysis
             % parallell construction in the stator)
             k_composite = (k_copper * copperFraction) + (k_steel * steelFraction);
         end
-        function C = calcThermalCapacitance(geometry, cp_composite)
+        function C = calcThermalCapacitance(geometry, cp_composite, componentType)
             % Extract geometric properties from structure
             outerDiameter = geometry.OuterDiameter / 1000; % Convert to meters
             innerDiameter = geometry.InnerDiameter / 1000; % Convert to meters
@@ -33,8 +32,20 @@ classdef MotorThermalAnalysis
             % Calculate the volume of the hollow cylinder (assuming it's a hollow cylinder)
             volume = pi * (outerDiameter^2 - innerDiameter^2) / 4 * length;
 
-            % Density (assuming some average density, needs to be adjusted based on actual material)
-            density = 8000; % Example: 8000 kg/m^3 for steel
+            % Set density based on component type
+            switch componentType
+                case 'stator'
+                    % Density for stator (half copper and half steel)
+                    density = (8000 + 8960) / 2; % Example: average of steel and copper density
+                case 'rotor'
+                    % Density for rotor (aluminum)
+                    density = 2700; % Example: density of aluminum
+                case 'axle'
+                    % Density for axle (steel)
+                    density = 8000; % Example: density of steel
+                otherwise
+                    error('Invalid component type');
+            end
 
             % Calculate mass
             mass = density * volume;
@@ -52,7 +63,7 @@ classdef MotorThermalAnalysis
             disp('<strong>Stator:</strong> Outer Diameter = 27.5 mm, Inner Diameter = 5 mm, Length = 26 mm, Thermal Conductivity = 225.5 W/mK, Heat Capacity = 0.4255 J/kgK');
             disp('<strong>Rotor:</strong> Outer Diameter = 35 mm, Inner Diameter = 30 mm, Length = 36 mm, Thermal Conductivity = 167 W/mK, Heat Capacity = 0.89 J/kgK');
             disp('<strong>Axle:</strong> Outer Diameter = 5 mm, Length = 55 mm, Thermal Conductivity = 50 W/mK, Heat Capacity = 0.466 J/kgK');
-            disp('<strong>Operational Parameters:</strong> Voltage = 14.7 V, Kv = 230 RPM/V, ax Motor Temp = 60C Phase Resistance = 0.055178 Ohms');
+            disp('<strong>Operational Parameters:</strong> Voltage = 14.7 V, Kv = 910 RPM/V, ax Motor Temp = 60C Phase Resistance = 0.055178 Ohms');
             disp('---------------------------------------------------');
             % Ask user to choose between default values or custom values
             choice = MotorThermalAnalysis.getYorNInput('Do you want to use default values? (Y/N): ');
@@ -69,10 +80,10 @@ classdef MotorThermalAnalysis
                 rotor = struct('OuterDiameter', 35, 'InnerDiameter', 30, 'Length', 36, 'K_Conductivity', 167, 'C_HeatCapacity', 890);
                 axle = struct('OuterDiameter', 5, 'InnerDiameter', 0.1, 'Length', 55, 'K_Conductivity', 50, 'C_HeatCapacity', 466);
                 motorComponents = struct('stator', stator, 'rotor', rotor, 'axle', axle);
-                motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178, 'Tmax',defaultTmax);
-                motorComponents.stator.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.stator, motorComponents.stator.C_HeatCapacity);
-                motorComponents.rotor.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.rotor, motorComponents.rotor.C_HeatCapacity);
-                motorComponents.axle.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.axle, motorComponents.axle.C_HeatCapacity);
+                motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 910, 'PhaseResistance', 0.055178, 'Tmax',defaultTmax);
+                motorComponents.stator.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.stator, motorComponents.stator.C_HeatCapacity, 'stator');
+                motorComponents.rotor.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.rotor, motorComponents.rotor.C_HeatCapacity, 'rotor');
+                motorComponents.axle.C_ThermalCapacitance = MotorThermalAnalysis.calcThermalCapacitance(motorComponents.axle, motorComponents.axle.C_HeatCapacity, 'axle');
             else
                 % Prompt for custom values
                 disp('<strong>==============================</strong>');
@@ -131,7 +142,7 @@ classdef MotorThermalAnalysis
 
                 if upper(choiceOperationalParams) == 'Y'
                     % Use default operational parameters
-                    motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 230, 'PhaseResistance', 0.055178, 'Tmax',defaultTmax);
+                    motorOperationalParams = struct('Voltage', 14.7, 'Current', 10, 'Kv', 910, 'PhaseResistance', 0.055178, 'Tmax',defaultTmax);
                 else
                     % Prompt for custom operational parameters
 
@@ -143,6 +154,8 @@ classdef MotorThermalAnalysis
                 end
                 % Construct and return the motorComponents and motorOperationalParams structures
                 motorComponents = struct('stator', stator, 'rotor', rotor, 'axle', axle);
+
+               
             end
 
         end
@@ -163,7 +176,7 @@ classdef MotorThermalAnalysis
             R_thermal = log(outerRadius/innerRadius) / (2 * pi * k * length);
 
             % Debugging print statement
-            disp(['<strong>R_cond calculated: </strong>', num2str(R_thermal)]);
+            %disp(['<strong>R_cond calculated: </strong>', num2str(R_thermal)]);
         end
 
         function response = getYorNInput(promptMessage)
@@ -209,14 +222,25 @@ classdef MotorThermalAnalysis
             Q = axle.K_Conductivity * A_cross_section * delta_T / L_heat_path;
 
             % Debugging print statement
-            disp(['<strong>Q (Heat Transfer via Axle) calculated: </strong>', num2str(Q)]);
+            %disp(['<strong>Q (Heat Transfer via Axle) calculated: </strong>', num2str(Q)]);
         end
 
         function [motorSpeed, powerLoss] = estimateMotorParameters(V, I, Kv, R_phase)
-            % Constant motor speed and simplified power loss calculation
-            motorSpeed = 4000; % Constant RPM
+            % Adjust motor speed based on current, with a maximum speed of 8000 RPM
+            if I < 1
+                motorSpeed = 0; % Motor speed approaches zero for low current
+            else
+                % Scaling factor to adjust motor speed
+                scalingFactor = 8000 / (Kv * V); % Adjust this based on maximum RPM and motor characteristics
+                
+                % Calculate motor speed with a cap at 8000 RPM
+                motorSpeed = min(Kv * V * I * scalingFactor, 8000);
+            end
+
+            % Power loss calculation
             powerLoss = I^2 * R_phase;
         end
+
 
         function h = calcConvectiveHeatTransferCoeff(motorSpeed, Diameter, T_surface, T_ambient)
             % Calculate the convective heat transfer coefficient (h)
@@ -255,17 +279,11 @@ classdef MotorThermalAnalysis
             end
 
             % Calculate h based on the type of convection
-            persistent switchedToNaturalLastTime; % Track the last mode of convection
             if isForcedConvectionApplicable
                 % Forced Convection
                 Nu = B * Re^n * Pr^(1/3);
-                switchedToNaturalLastTime = false;
             else
                 % Natural Convection
-                if ~switchedToNaturalLastTime
-                    disp('Switching to natural convection.');
-                    switchedToNaturalLastTime = true;
-                end
                 delta_T = T_surface - T_ambient;
                 Gr = g * beta * abs(delta_T) * (Diameter / 1000)^3 / nu^2; % Grashof number
                 Ra = Gr * Pr; % Rayleigh number
@@ -288,28 +306,54 @@ classdef MotorThermalAnalysis
             % surfaceArea in m^2
 
             R_conv = 1 / (h * surfaceArea);
-            fprintf("Here is the R_conv: %d",R_conv);
+            %fprintf("Here is the R_conv: %d",R_conv);
         end
 
         function I = currentProfile(t, lowCurrentStarts, lowCurrentEnds)
             % Simplified current profile for constant RPM
             % Check if it's a low-current period
-            if MotorThermalAnalysis.lowCurrentPeriod(t, lowCurrentStarts, lowCurrentEnds)
+            if MotorThermalAnalysis.isLowCurrentPeriod(t, lowCurrentStarts, lowCurrentEnds)
                 I = 1; % Low current value
                 return;
             end
 
             % Existing logic for normal operation
             % Base Oscillation
-            I = 8 + 6 * sin(2 * pi * t / 50);
+            I = 15 + 6 * sin(2 * pi * t / 50);
         end
 
-        function isLowCurrent = lowCurrentPeriod(t, lowCurrentStarts, lowCurrentEnds)
+        function isLowCurrent = isLowCurrentPeriod(t, lowCurrentStarts, lowCurrentEnds)
             % Check if current time is within any of the low current periods
             isLowCurrent = any(t >= lowCurrentStarts & t <= lowCurrentEnds);
-            disp(['Low Current Period Check at time: ', num2str(t), ', Result: ', num2str(isLowCurrent)]);
+            %disp(['Low Current Period Check at time: ', num2str(t), ', Result: ', num2str(isLowCurrent)]);
         end
 
+        function I = currentProfileForGait(t, total_time, lowCurrentStarts, lowCurrentEnds)
+            % Check for low current period
+            if MotorThermalAnalysis.isLowCurrentPeriod(t, lowCurrentStarts, lowCurrentEnds)
+                I = 1; % Low current value for low current periods
+                return;
+            end
+
+            % Divide the total time into three phases: walking, trotting, and running
+            phase_duration = total_time / 3;
+
+            % Walking Phase (0 to phase_duration)
+            if t <= phase_duration
+                % Moderate and stable current for walking
+                I = 5 + 1 * sin(2 * pi * t / 50); % Example values
+
+                % Trotting Phase (phase_duration to 2 * phase_duration)
+            elseif t <= 2 * phase_duration
+                % Higher and more fluctuating current for trotting
+                I = 8 + 3 * sin(2 * pi * t / 25); % More fluctuation
+
+                % Running Phase (2 * phase_duration to total_time)
+            else
+                % Highest and most fluctuating current for running
+                I = 15 + 8 * sin(2 * pi * t / 15); % Highest peaks
+            end
+        end
     end
 
 end
