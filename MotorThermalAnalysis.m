@@ -1,7 +1,5 @@
 
 classdef MotorThermalAnalysis
-    properties (Constant)
-    end
     methods (Static)
         function [cp_composite, k_composite] = calcCompositeProperties(copperFraction)
             % Define the specific heat capacities (J/g°C)
@@ -23,6 +21,7 @@ classdef MotorThermalAnalysis
             % parallell construction in the stator)
             k_composite = (k_copper * copperFraction) + (k_steel * steelFraction);
         end
+
         function C = calcThermalCapacitance(geometry, cp_composite, componentType)
             % Extract geometric properties from structure
             outerDiameter = geometry.OuterDiameter / 1000; % Convert to meters
@@ -155,7 +154,7 @@ classdef MotorThermalAnalysis
                 % Construct and return the motorComponents and motorOperationalParams structures
                 motorComponents = struct('stator', stator, 'rotor', rotor, 'axle', axle);
 
-               
+
             end
 
         end
@@ -227,12 +226,12 @@ classdef MotorThermalAnalysis
 
         function [motorSpeed, powerLoss] = estimateMotorParameters(V, I, Kv, R_phase)
             % Adjust motor speed based on current, with a maximum speed of 8000 RPM
-            if I < 1
+            if I < 2
                 motorSpeed = 0; % Motor speed approaches zero for low current
             else
                 % Scaling factor to adjust motor speed
                 scalingFactor = 8000 / (Kv * V); % Adjust this based on maximum RPM and motor characteristics
-                
+
                 % Calculate motor speed with a cap at 8000 RPM
                 motorSpeed = min(Kv * V * I * scalingFactor, 8000);
             end
