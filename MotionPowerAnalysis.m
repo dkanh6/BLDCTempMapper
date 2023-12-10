@@ -133,5 +133,26 @@ classdef MotionPowerAnalysis
 
             hold off;
         end
+
+        function torque = calculateJointTorque(mass, numLegsOnGround, linkLength, jointAngle, gravity)
+            % mass: Total mass of the quadruped (kg)
+            % numLegsOnGround: Number of legs on the ground supporting the weight
+            % linkLength: Length of the leg link (m)
+            % jointAngle: Angle of the joint (degrees)
+            % gravity: Acceleration due to gravity (m/s^2), typically 9.81 m/s^2
+
+            % Convert joint angle from degrees to radians
+            jointAngleRad = deg2rad(jointAngle);
+
+            % Calculate the force experienced by each leg
+            forcePerLeg = (mass * gravity) / numLegsOnGround;
+            fprintf("Here is force per leg: %d\n",forcePerLeg)
+
+            % Calculate the vertical component of the force assuming the force acts at the end of the link
+            verticalForceComponent = forcePerLeg * cos(jointAngleRad);
+
+            % Calculate the torque at the joint Torque
+            torque = verticalForceComponent * linkLength;
+        end 
     end
 end
